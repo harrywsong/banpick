@@ -36,14 +36,14 @@ export default function HomePage() {
             </svg>
           </div>
           <div>
-            <div style={styles.vctLabel}>VCT</div>
+            <div style={styles.vctLabel}>내전</div>
             <h1 style={styles.title}>Ban<span style={styles.titleAccent}>/</span>Pick</h1>
             <div style={styles.subtitle}>Simulator</div>
           </div>
         </div>
 
         <p style={styles.description}>
-          Simulate professional Valorant map ban/pick sessions for BO1, BO3, and BO5 formats
+          Map ban/pick simulator for BO1, BO3, and BO5 formats
         </p>
 
         {/* Action Buttons */}
@@ -137,7 +137,16 @@ export default function HomePage() {
       </div>
 
       <footer style={styles.footer}>
-        <span style={{ color: 'rgba(255,255,255,0.3)' }}>VCT Ban/Pick Simulator — Community Tool</span>
+        <a
+          href="https://www.instagram.com/dngur.thd/"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={styles.footerLink}
+          onMouseEnter={(e) => (e.currentTarget.style.color = '#ffffff')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.3)')}
+        >
+          @dngur.thd
+        </a>
       </footer>
     </div>
   );
@@ -350,5 +359,11 @@ const styles = {
   footer: {
     marginTop: '2rem',
     fontSize: '0.75rem',
+  },
+  footerLink: {
+    color: 'rgba(255,255,255,0.3)',
+    textDecoration: 'none',
+    fontSize: '0.75rem',
+    transition: 'color 0.2s ease',
   },
 };

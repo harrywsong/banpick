@@ -148,7 +148,7 @@ export default function LobbyPage() {
       <div style={pageStyles.centered}>
         <div style={pageStyles.joinCard}>
           <div style={pageStyles.joinHeader}>
-            <div style={pageStyles.vctTag}>VCT Ban/Pick</div>
+            <div style={pageStyles.vctTag}>내전 Ban/Pick</div>
             <h2 style={pageStyles.joinTitle}>Join Lobby</h2>
             <div style={pageStyles.joinLobbyId}>{lobbyId}</div>
           </div>
@@ -262,7 +262,7 @@ export default function LobbyPage() {
           ← Home
         </button>
         <div style={pageStyles.topTitle}>
-          <span style={{ color: '#ff4655', fontWeight: 900 }}>VCT</span> Ban/Pick
+          <span style={{ color: '#ff4655', fontWeight: 900 }}>내전</span> Ban/Pick
         </div>
         <div style={{ width: '60px' }} />
       </div>

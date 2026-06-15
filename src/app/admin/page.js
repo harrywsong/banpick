@@ -78,7 +78,7 @@ export default function AdminPage() {
             ← Back
           </button>
           <div style={styles.headerTitle}>
-            <div style={styles.vctTag}>VCT</div>
+            <div style={styles.vctTag}>내전</div>
             <h1 style={styles.title}>Create Lobby</h1>
           </div>
         </div>

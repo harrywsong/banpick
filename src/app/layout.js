@@ -1,8 +1,8 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'VCT Ban/Pick Simulator',
-  description: 'Valorant Champions Tour ban/pick simulation tool',
+  title: 'Ban/Pick Simulator',
+  description: 'Ban/pick simulation tool for Valorant',
 };
 
 export default function RootLayout({ children }) {
