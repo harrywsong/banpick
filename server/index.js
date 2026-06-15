@@ -7,7 +7,10 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: '*',
+    origin: [
+      'http://40.233.95.61:4002',
+      'http://localhost:4002',
+    ],
     methods: ['GET', 'POST'],
   },
 });
