@@ -6,7 +6,11 @@ let socket;
 
 export function getSocket() {
   if (!socket) {
-    socket = io('http://localhost:3001', {
+    const serverUrl = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      ? `http://${window.location.hostname}:4003`
+      : 'http://localhost:4003';
+
+    socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,

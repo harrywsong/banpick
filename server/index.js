@@ -7,7 +7,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: 'http://localhost:3000',
+    origin: ['http://localhost:4002', 'http://0.0.0.0:4002'],
     methods: ['GET', 'POST'],
   },
 });
@@ -415,7 +415,7 @@ function checkComplete(lobby) {
   }
 }
 
-const PORT = 3001;
+const PORT = 4003;
 httpServer.listen(PORT, () => {
   console.log(`[Server] VCT Ban/Pick server running on http://localhost:${PORT}`);
 });
