@@ -197,7 +197,7 @@ export default function AdminPage() {
                 </button>
               </div>
               <p style={styles.shareHint}>
-                Players should go to <span style={{ color: '#ff4655' }}>localhost:3000</span> and click "Join Lobby"
+                Players should go to <span style={{ color: '#ff4655' }}>http://40.233.95.61:4002/</span> and click "Join Lobby"
               </p>
             </div>
 

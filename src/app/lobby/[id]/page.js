@@ -142,6 +142,15 @@ export default function LobbyPage() {
     });
   }
 
+  function handleChooseStartSide(side) {
+    const socket = getSocket();
+    socket.emit('chooseStartSide', { lobbyId, side }, (res) => {
+      if (!res?.success) {
+        showNotif(res?.error || 'Action failed', 'error');
+      }
+    });
+  }
+
   // ─── RENDER: Name Entry ──────────────────────────────────────────────────────
   if (joinStep === 'name') {
     return (
@@ -158,7 +167,7 @@ export default function LobbyPage() {
             <input
               style={pageStyles.joinInput}
               type="text"
-              placeholder="e.g. Team Liquid, NRG..."
+              placeholder="e.g. T1, GEN.G, KRX..."
               value={teamName}
               onChange={(e) => {
                 setTeamName(e.target.value);
@@ -387,6 +396,18 @@ export default function LobbyPage() {
                 </div>
               )}
             </div>
+
+            {/* Side choice overlay — shown when a pick just happened */}
+            <AnimatePresence>
+              {lobby.pendingSideChoice && (
+                <SideChoiceOverlay
+                  pendingSideChoice={lobby.pendingSideChoice}
+                  lobby={lobby}
+                  myRole={myRole}
+                  onChoose={handleChooseStartSide}
+                />
+              )}
+            </AnimatePresence>
           </div>
         )}
 
@@ -408,17 +429,18 @@ export default function LobbyPage() {
                   </div>
                   <div style={pageStyles.resultMapList}>
                     {lobby.result.banned.map((entry, i) => (
-                      <div key={i} style={pageStyles.resultMapCard(false, false)}>
-                        <div style={pageStyles.resultMapName}>{entry.map}</div>
-                        <div style={pageStyles.resultMapTeam}>
-                          <span
-                            style={{
-                              color: entry.team === 'team1' ? '#3b82f6' : '#ef4444',
-                            }}
-                          >
+                      <div key={i} style={pageStyles.banCard}>
+                        <div style={pageStyles.banCardMapName}>{entry.map}</div>
+                        <div style={pageStyles.banCardRow}>
+                          <span style={{
+                            ...pageStyles.teamTag,
+                            color: entry.team === 'team1' ? '#3b82f6' : '#ef4444',
+                            borderColor: entry.team === 'team1' ? 'rgba(59,130,246,0.3)' : 'rgba(239,68,68,0.3)',
+                            background: entry.team === 'team1' ? 'rgba(59,130,246,0.08)' : 'rgba(239,68,68,0.08)',
+                          }}>
                             {entry.team === 'team1' ? team1Name : team2Name}
-                          </span>{' '}
-                          banned
+                          </span>
+                          <span style={pageStyles.actionLabel}>banned</span>
                         </div>
                       </div>
                     ))}
@@ -433,27 +455,67 @@ export default function LobbyPage() {
                     <span style={{ color: '#3b82f6' }}>✓</span> PICKED MAPS
                   </div>
                   <div style={pageStyles.resultMapList}>
-                    {lobby.result.picked.map((entry, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          ...pageStyles.resultMapCard(true, entry.team === 'team1'),
-                        }}
-                      >
-                        <div style={pageStyles.resultMapName}>{entry.map}</div>
-                        <div style={pageStyles.resultMapTeam}>
-                          <span
-                            style={{
-                              color: entry.team === 'team1' ? '#3b82f6' : '#ef4444',
-                              fontWeight: 700,
-                            }}
-                          >
-                            {entry.team === 'team1' ? team1Name : team2Name}
-                          </span>{' '}
-                          picked
+                    {lobby.result.picked.map((entry, i) => {
+                      const pickerName = entry.team === 'team1' ? team1Name : team2Name;
+                      const pickerColor = entry.team === 'team1' ? '#3b82f6' : '#ef4444';
+                      const sideChooserTeam = entry.team === 'team1' ? 'team2' : 'team1';
+                      const sideChooserName = sideChooserTeam === 'team1' ? team1Name : team2Name;
+                      const sideChooserColor = sideChooserTeam === 'team1' ? '#3b82f6' : '#ef4444';
+                      return (
+                        <div key={i} style={{
+                          ...pageStyles.pickCard,
+                          borderColor: entry.team === 'team1' ? 'rgba(59,130,246,0.25)' : 'rgba(239,68,68,0.25)',
+                        }}>
+                          {/* Map name */}
+                          <div style={pageStyles.pickCardMapName}>{entry.map}</div>
+
+                          {/* Picked by row */}
+                          <div style={pageStyles.pickCardRow}>
+                            <span style={pageStyles.pickCardIcon}>✓</span>
+                            <span style={pageStyles.pickCardLabel}>Picked by</span>
+                            <span style={{
+                              ...pageStyles.teamTag,
+                              color: pickerColor,
+                              borderColor: `${pickerColor}40`,
+                              background: `${pickerColor}12`,
+                            }}>
+                              {pickerName}
+                            </span>
+                          </div>
+
+                          {/* Side chosen row */}
+                          <div style={pageStyles.pickCardRow}>
+                            <span style={pageStyles.pickCardIcon}>
+                              {entry.side === 'attack' ? '⚔' : entry.side === 'defense' ? '🛡' : '·'}
+                            </span>
+                            <span style={pageStyles.pickCardLabel}>Starting side</span>
+                            {entry.side ? (
+                              <>
+                                <span style={{
+                                  ...pageStyles.sideTag,
+                                  color: entry.side === 'attack' ? '#f97316' : '#60a5fa',
+                                  borderColor: entry.side === 'attack' ? 'rgba(249,115,22,0.35)' : 'rgba(96,165,250,0.35)',
+                                  background: entry.side === 'attack' ? 'rgba(249,115,22,0.1)' : 'rgba(96,165,250,0.1)',
+                                }}>
+                                  {entry.side === 'attack' ? 'ATTACK' : 'DEFENSE'}
+                                </span>
+                                <span style={pageStyles.pickCardLabel}>for</span>
+                                <span style={{
+                                  ...pageStyles.teamTag,
+                                  color: sideChooserColor,
+                                  borderColor: `${sideChooserColor}40`,
+                                  background: `${sideChooserColor}12`,
+                                }}>
+                                  {sideChooserName}
+                                </span>
+                              </>
+                            ) : (
+                              <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem' }}>—</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -466,7 +528,34 @@ export default function LobbyPage() {
                   </div>
                   <div style={pageStyles.deciderCard}>
                     <div style={pageStyles.deciderMapName}>{lobby.result.decider}</div>
-                    <div style={pageStyles.deciderSubLabel}>Remaining Map</div>
+                    {lobby.result.deciderSide ? (
+                      <>
+                        <div style={pageStyles.deciderSideRow}>
+                          <span style={{
+                            ...pageStyles.sideTag,
+                            color: lobby.result.deciderSide === 'attack' ? '#f97316' : '#60a5fa',
+                            borderColor: lobby.result.deciderSide === 'attack' ? 'rgba(249,115,22,0.35)' : 'rgba(96,165,250,0.35)',
+                            background: lobby.result.deciderSide === 'attack' ? 'rgba(249,115,22,0.1)' : 'rgba(96,165,250,0.1)',
+                            fontSize: '0.8rem',
+                            padding: '0.2rem 0.6rem',
+                          }}>
+                            {lobby.result.deciderSide === 'attack' ? '⚔ ATTACK' : '🛡 DEFENSE'}
+                          </span>
+                          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>for</span>
+                          <span style={{
+                            ...pageStyles.teamTag,
+                            color: lobby.result.deciderSideChooser === 'team1' ? '#3b82f6' : '#ef4444',
+                            borderColor: lobby.result.deciderSideChooser === 'team1' ? 'rgba(59,130,246,0.35)' : 'rgba(239,68,68,0.35)',
+                            background: lobby.result.deciderSideChooser === 'team1' ? 'rgba(59,130,246,0.1)' : 'rgba(239,68,68,0.1)',
+                          }}>
+                            {lobby.result.deciderSideChooser === 'team1' ? team1Name : team2Name}
+                          </span>
+                        </div>
+                        <div style={pageStyles.deciderSubLabel}>Remaining Map</div>
+                      </>
+                    ) : (
+                      <div style={pageStyles.deciderSubLabel}>Remaining Map — sides decided at match start</div>
+                    )}
                   </div>
                 </div>
               )}
@@ -513,6 +602,210 @@ export default function LobbyPage() {
     </div>
   );
 }
+
+function SideChoiceOverlay({ pendingSideChoice, lobby, myRole, onChoose }) {
+  const { map, pickedBy, choosingTeam, isDecider } = pendingSideChoice;
+  const isChoosing = myRole === choosingTeam;
+
+  const pickedByName = lobby.teams?.[pickedBy]?.name || (pickedBy === 'team1' ? 'Team 1' : 'Team 2');
+  const choosingName = lobby.teams?.[choosingTeam]?.name || (choosingTeam === 'team1' ? 'Team 1' : 'Team 2');
+
+  return (
+    <motion.div
+      style={overlayStyles.backdrop}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        style={overlayStyles.card}
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+      >
+        <div style={overlayStyles.tag}>SIDE SELECTION</div>
+        <div style={overlayStyles.mapName}>{map}</div>
+        <p style={overlayStyles.desc}>
+          {isDecider
+            ? <span>This is the <strong style={{ color: '#f59e0b' }}>decider map</strong></span>
+            : <>Picked by{' '}
+                <strong style={{ color: pickedBy === 'team1' ? '#3b82f6' : '#ef4444' }}>
+                  {pickedByName}
+                </strong>
+              </>
+          }
+        </p>
+
+        {isChoosing ? (
+          <>
+            <p style={overlayStyles.prompt}>
+              You choose which side to start on
+            </p>
+            <div style={overlayStyles.sideButtons}>
+              <button
+                style={overlayStyles.attackBtn}
+                onClick={() => onChoose('attack')}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(249,115,22,0.35)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(249,115,22,0.2)'; }}
+              >
+                <span style={overlayStyles.sideIcon}>⚔</span>
+                <span style={overlayStyles.sideName}>ATTACK</span>
+                <span style={overlayStyles.sideSub}>Start as Attackers</span>
+              </button>
+              <button
+                style={overlayStyles.defenseBtn}
+                onClick={() => onChoose('defense')}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(96,165,250,0.35)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 15px rgba(96,165,250,0.2)'; }}
+              >
+                <span style={overlayStyles.sideIcon}>🛡</span>
+                <span style={overlayStyles.sideName}>DEFENSE</span>
+                <span style={overlayStyles.sideSub}>Start as Defenders</span>
+              </button>
+            </div>
+          </>
+        ) : (
+          <div style={overlayStyles.waiting}>
+            <div style={overlayStyles.waitDots}>
+              <span style={{ ...overlayStyles.dot, animationDelay: '0s' }} />
+              <span style={{ ...overlayStyles.dot, animationDelay: '0.2s' }} />
+              <span style={{ ...overlayStyles.dot, animationDelay: '0.4s' }} />
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.95rem' }}>
+              Waiting for{' '}
+              <strong style={{ color: choosingTeam === 'team1' ? '#3b82f6' : '#ef4444' }}>
+                {choosingName}
+              </strong>{' '}
+              to choose their starting side...
+            </p>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+const overlayStyles = {
+  backdrop: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.75)',
+    backdropFilter: 'blur(6px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 100,
+    padding: '1.5rem',
+  },
+  card: {
+    background: '#111111',
+    border: '1px solid #2a2a2a',
+    borderRadius: '16px',
+    padding: '2.5rem',
+    maxWidth: '480px',
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '1.25rem',
+    textAlign: 'center',
+    boxShadow: '0 25px 60px rgba(0,0,0,0.6)',
+  },
+  tag: {
+    fontSize: '0.65rem',
+    letterSpacing: '0.3em',
+    color: '#ff4655',
+    fontWeight: 800,
+    textTransform: 'uppercase',
+  },
+  mapName: {
+    fontSize: '2.25rem',
+    fontWeight: 900,
+    color: '#ffffff',
+    letterSpacing: '-0.02em',
+    lineHeight: 1,
+  },
+  desc: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: '0.9rem',
+    margin: 0,
+  },
+  prompt: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: '1rem',
+    fontWeight: 600,
+    margin: 0,
+  },
+  sideButtons: {
+    display: 'flex',
+    gap: '1rem',
+    width: '100%',
+  },
+  attackBtn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.4rem',
+    padding: '1.5rem 1rem',
+    background: 'rgba(249,115,22,0.1)',
+    border: '2px solid rgba(249,115,22,0.35)',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    color: '#ffffff',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    boxShadow: '0 4px 15px rgba(249,115,22,0.2)',
+  },
+  defenseBtn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.4rem',
+    padding: '1.5rem 1rem',
+    background: 'rgba(96,165,250,0.1)',
+    border: '2px solid rgba(96,165,250,0.35)',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    color: '#ffffff',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    boxShadow: '0 4px 15px rgba(96,165,250,0.2)',
+  },
+  sideIcon: {
+    fontSize: '2rem',
+    lineHeight: 1,
+  },
+  sideName: {
+    fontSize: '1rem',
+    fontWeight: 900,
+    letterSpacing: '0.08em',
+  },
+  sideSub: {
+    fontSize: '0.7rem',
+    color: 'rgba(255,255,255,0.45)',
+    fontWeight: 500,
+  },
+  waiting: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '0.75rem',
+    padding: '1rem 0',
+  },
+  waitDots: {
+    display: 'flex',
+    gap: '4px',
+  },
+  dot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    background: '#ff4655',
+    display: 'inline-block',
+    animation: 'bounce 1.4s infinite ease-in-out',
+  },
+};
 
 function WaitTeamSlot({ name, joined, num }) {
   return (
@@ -804,32 +1097,87 @@ const pageStyles = {
     flexWrap: 'wrap',
     gap: '0.75rem',
   },
-  resultMapCard: (isPicked, isTeam1) => ({
-    padding: '0.875rem 1.25rem',
-    background: isPicked
-      ? isTeam1
-        ? 'rgba(59,130,246,0.08)'
-        : 'rgba(239,68,68,0.08)'
-      : 'rgba(239,68,68,0.06)',
-    border: `1px solid ${
-      isPicked
-        ? isTeam1
-          ? 'rgba(59,130,246,0.25)'
-          : 'rgba(239,68,68,0.25)'
-        : 'rgba(239,68,68,0.2)'
-    }`,
+  // Ban card
+  banCard: {
+    padding: '0.75rem 1rem',
+    background: 'rgba(239,68,68,0.05)',
+    border: '1px solid rgba(239,68,68,0.18)',
     borderRadius: '8px',
-    minWidth: '140px',
-  }),
-  resultMapName: {
+    minWidth: '130px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.4rem',
+  },
+  banCardMapName: {
     fontSize: '1rem',
     fontWeight: 800,
     color: '#ffffff',
-    marginBottom: '0.25rem',
+    letterSpacing: '0.01em',
   },
-  resultMapTeam: {
+  banCardRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+  },
+  // Pick card — two-row breakdown
+  pickCard: {
+    padding: '0.875rem 1rem',
+    background: '#111',
+    border: '1px solid',
+    borderRadius: '10px',
+    minWidth: '200px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+  },
+  pickCardMapName: {
+    fontSize: '1.1rem',
+    fontWeight: 900,
+    color: '#ffffff',
+    letterSpacing: '-0.01em',
+    paddingBottom: '0.35rem',
+    borderBottom: '1px solid rgba(255,255,255,0.07)',
+  },
+  pickCardRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    flexWrap: 'wrap',
+  },
+  pickCardIcon: {
+    fontSize: '0.8rem',
+    width: '16px',
+    textAlign: 'center',
+    flexShrink: 0,
+  },
+  pickCardLabel: {
+    fontSize: '0.72rem',
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: 500,
+    whiteSpace: 'nowrap',
+  },
+  // Shared tag styles
+  teamTag: {
     fontSize: '0.75rem',
-    color: 'rgba(255,255,255,0.5)',
+    fontWeight: 700,
+    padding: '0.1rem 0.45rem',
+    borderRadius: '4px',
+    border: '1px solid',
+    whiteSpace: 'nowrap',
+  },
+  sideTag: {
+    fontSize: '0.72rem',
+    fontWeight: 800,
+    padding: '0.1rem 0.45rem',
+    borderRadius: '4px',
+    border: '1px solid',
+    letterSpacing: '0.04em',
+    whiteSpace: 'nowrap',
+  },
+  actionLabel: {
+    fontSize: '0.72rem',
+    color: 'rgba(255,255,255,0.4)',
+    fontWeight: 500,
   },
   deciderCard: {
     padding: '1.25rem 2rem',
@@ -850,6 +1198,13 @@ const pageStyles = {
     fontSize: '0.75rem',
     color: 'rgba(245,158,11,0.6)',
     letterSpacing: '0.1em',
+  },
+  deciderSideRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+    flexWrap: 'wrap',
+    marginTop: '0.25rem',
   },
   finalGrid: {
     display: 'flex',

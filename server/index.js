@@ -139,10 +139,13 @@ io.on('connection', (socket) => {
       sequence, // unresolved (first/second)
       resolvedSequence: null, // resolved after banFirst chosen
       currentStep: 0,
+      pendingSideChoice: null, // set after each pick until opponent chooses side
       result: {
         banned: [],
         picked: [],
         decider: null,
+        deciderSide: null,
+        deciderSideChooser: null,
       },
     };
 
@@ -340,13 +343,61 @@ io.on('connection', (socket) => {
     }
 
     lobby.mapStates[mapName] = actingTeam === 'team1' ? 'picked_team1' : 'picked_team2';
-    lobby.result.picked.push({ map: mapName, team: actingTeam });
+    // Push pick with placeholder side — will be filled in by chooseStartSide
+    lobby.result.picked.push({ map: mapName, team: actingTeam, side: null });
     lobby.currentStep++;
 
+    // After a pick, the OPPONENT chooses which side to start on
+    const opponent = actingTeam === 'team1' ? 'team2' : 'team1';
+    lobby.pendingSideChoice = {
+      map: mapName,
+      pickedBy: actingTeam,
+      choosingTeam: opponent,
+      pickIndex: lobby.result.picked.length - 1,
+    };
+
+    // Do NOT advance further — wait for chooseStartSide
+    console.log(`[Lobby] ${lobbyId}: ${actingTeam} picked ${mapName}, waiting for ${opponent} to choose side`);
+    broadcastLobby(lobbyId);
+    if (callback) callback({ success: true });
+  });
+
+  // ─── CHOOSE START SIDE ────────────────────────────────────────────────────────
+  socket.on('chooseStartSide', ({ lobbyId, side }, callback) => {
+    const lobby = lobbies.get(lobbyId);
+    if (!lobby || lobby.phase !== 'ban_pick' || !lobby.pendingSideChoice) {
+      if (callback) callback({ success: false, error: 'Invalid state' });
+      return;
+    }
+
+    const { choosingTeam, pickIndex, isDecider, map } = lobby.pendingSideChoice;
+    if (lobby.teams[choosingTeam]?.socketId !== socket.id) {
+      if (callback) callback({ success: false, error: 'Not your turn to choose side' });
+      return;
+    }
+
+    if (side !== 'attack' && side !== 'defense') {
+      if (callback) callback({ success: false, error: 'Invalid side' });
+      return;
+    }
+
+    if (isDecider) {
+      // Store side on the decider result
+      lobby.result.deciderSide = side;
+      lobby.result.deciderSideChooser = choosingTeam;
+      console.log(`[Lobby] ${lobbyId}: ${choosingTeam} chose ${side} on decider ${map}`);
+    } else {
+      // Store side on the picked map entry
+      lobby.result.picked[pickIndex].side = side;
+      console.log(`[Lobby] ${lobbyId}: ${choosingTeam} chose ${side} on ${lobby.result.picked[pickIndex].map}`);
+    }
+
+    lobby.pendingSideChoice = null;
+
+    // Continue sequence — for decider this just hits checkComplete
     advanceAutoSteps(lobby);
     checkComplete(lobby);
 
-    console.log(`[Lobby] ${lobbyId} step ${lobby.currentStep - 1}: ${actingTeam} picked ${mapName}`);
     broadcastLobby(lobbyId);
     if (callback) callback({ success: true });
   });
@@ -385,20 +436,32 @@ io.on('connection', (socket) => {
 });
 
 /**
- * Advance through auto-decider steps automatically
+ * Advance through auto-decider steps automatically.
+ * If the next step is a decider, mark the map but then pause for side selection
+ * (coin flip loser chooses starting side on the decider).
  */
 function advanceAutoSteps(lobby) {
   if (!lobby.resolvedSequence) return;
   while (lobby.currentStep < lobby.resolvedSequence.length) {
     const step = lobby.resolvedSequence[lobby.currentStep];
     if (step.action === 'decider' && step.team === 'auto') {
-      // Find remaining available map and mark as decider
       const remaining = lobby.maps.find((m) => lobby.mapStates[m] === 'available');
       if (remaining) {
         lobby.mapStates[remaining] = 'decider';
         lobby.result.decider = remaining;
         lobby.currentStep++;
         console.log(`[Lobby] Auto-decider: ${remaining}`);
+
+        // Coin flip loser chooses starting side on the decider
+        const deciderSideChooser = lobby.coinWinner === 'team1' ? 'team2' : 'team1';
+        lobby.pendingSideChoice = {
+          map: remaining,
+          pickedBy: null,        // no one "picked" it — it's the decider
+          isDecider: true,
+          choosingTeam: deciderSideChooser,
+          pickIndex: null,
+        };
+        console.log(`[Lobby] Waiting for ${deciderSideChooser} to choose side on decider ${remaining}`);
       }
       break;
     } else {
@@ -408,10 +471,12 @@ function advanceAutoSteps(lobby) {
 }
 
 /**
- * Check if ban/pick is complete
+ * Check if ban/pick is complete.
+ * Never complete while a side choice is still pending.
  */
 function checkComplete(lobby) {
   if (!lobby.resolvedSequence) return;
+  if (lobby.pendingSideChoice) return; // wait for side selection first
   if (lobby.currentStep >= lobby.resolvedSequence.length) {
     lobby.phase = 'complete';
     console.log(`[Lobby] ${lobby.id} ban/pick complete`);
